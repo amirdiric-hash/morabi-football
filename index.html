@@ -1352,7 +1352,7 @@ html, body {
     <div class="ball">⚽</div><h1>سرمربی برتر</h1><p>برای ورود به باشگاه مربیگری، نام کاربری و رمز عبور خود را وارد کنید.</p>
     <div class="field"><label>نام کاربری</label><input id="username" placeholder="مثلاً Amir"></div>
     <div class="field"><label>رمز عبور</label><input id="password" type="password" placeholder="رمز عبور"></div>
-    <button class="loginBtn" onclick="login()">ورود به بازی</button><div id="err" class="err"></div>
+    <button class="loginBtn" onclick="login()">ثبت‌نام / ورود به بازی</button><div id="err" class="err"></div>
   </div>
 </div>
 
@@ -1453,7 +1453,7 @@ html, body {
   <div class="leagueHead">
     <div>
       <div class="leagueTitle">🏆 لیگ</div>
-      <div class="leagueSub">هر لیگ دقیقاً <b>۳۵ بازی</b> دارد؛ روزی <b>۵ بازی</b> در ساعت‌های ۱۲:۰۰، ۱۴:۰۰، ۱۷:۰۰، ۱۹:۰۰ و ۲۲:۰۰.</div>
+      <div class="leagueSub">۱۰ بازیکن واقعی • روزی <b>۲ بازی</b> • مدت هر لیگ <b>۷ روز</b> • بازی‌ها چه آنلاین باشی چه آفلاین ادامه پیدا می‌کنند.</div>
     </div>
     <div id="leagueBadge" class="leagueBadge">لیگ ۸<br>آماتور</div>
   </div>
@@ -1511,8 +1511,8 @@ html, body {
   <div id="leagueAwardNotice"></div>
 
   <div class="leagueNotice">
-    🕐 <b>ساعت‌های ثابت:</b> ۱۲:۰۰ • ۱۴:۰۰ • ۱۷:۰۰ • ۱۹:۰۰ • ۲۲:۰۰<br>
-    ⚽ <b>۳۵ بازی:</b> هر روز ۵ مسابقه، در مجموع ۷ روز.<br>
+    🕐 <b>ساعت‌های ثابت:</b> ۱۴:۰۰ • ۲۱:۰۰<br>
+    ⚽ <b>۱۴ بازی برای هر بازیکن:</b> روزی ۲ مسابقه، در مجموع ۷ روز.<br>
     📋 بعد از انجام هر بازی، دکمه <b>گزارش بازی</b> فعال می‌شود و ترکیب، عملکرد بازیکنان و بهترین بازیکن را نشان می‌دهد.
   </div>
 </section>
@@ -2625,16 +2625,32 @@ function rankingPlayerKey(name){
   let h=2166136261; for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}
   return (h>>>0).toString(36);
 }
+function rankingBanValue(v){
+  if(v===true||v===1)return true;
+  const x=String(v??'').trim().toLowerCase();
+  return x==='true'||x==='1'||x==='yes'||x==='banned'||x==='ban'||x==='blocked'||x==='مسدود'||x==='بن';
+}
+function isRankingBanned(){
+  try{
+    const direct=['rankingBanned','coachBanned','userBanned','isBanned','banned','blocked','isBlocked'];
+    for(const k of direct){if(rankingBanValue(localStorage.getItem(k)))return true;}
+    const untilKeys=['rankingBanUntil','coachBanUntil','userBanUntil','banUntil','blockedUntil'];
+    const now=Date.now();
+    for(const k of untilKeys){const v=Number(localStorage.getItem(k)||0);if(v>now)return true;}
+  }catch(e){}
+  return false;
+}
 function rankingPlayerData(){
   const name=chatPlayerName();
   let ovr=0; try{ovr=Number(getTeamOverall()||0)}catch(e){ovr=0}
-  return {name,ovr:Math.round(ovr*10)/10,league:Number((getLeagueState()||{}).level||8),updated:Date.now()};
+  const joinAt=Number(localStorage.getItem('weeklyLeagueJoinAt')||Date.now()); if(!localStorage.getItem('weeklyLeagueJoinAt')) localStorage.setItem('weeklyLeagueJoinAt',String(joinAt));
+  return {name,ovr:Math.round(ovr*10)/10,league:Number((typeof window.getLeagueState==='function'?window.getLeagueState():{}).level||8),updated:Date.now(),joinAt,banned:isRankingBanned()};
 }
 function saveRankingCache(){try{localStorage.setItem(RANKING_CACHE_KEY,JSON.stringify(rankingRows))}catch(e){}}
 function loadRankingCache(){try{const x=JSON.parse(localStorage.getItem(RANKING_CACHE_KEY)||'{}');if(x&&typeof x==='object')rankingRows=x}catch(e){}}
 function renderRanking(){
   const box=document.getElementById('rankingList'); if(!box)return;
-  const rows=Object.values(rankingRows||{}).filter(x=>x&&x.name).sort((a,b)=>Number(b.ovr||0)-Number(a.ovr||0)||String(a.name).localeCompare(String(b.name),'fa')).slice(0,10);
+  const rows=Object.values(rankingRows||{}).filter(x=>x&&x.name&&!x.banned).sort((a,b)=>Number(b.ovr||0)-Number(a.ovr||0)||String(a.name).localeCompare(String(b.name),'fa')).slice(0,10);
   if(!rows.length){box.innerHTML='<div class="rankingEmpty">🏆<br><b>هنوز رتبه‌ای ثبت نشده</b><br><small>با ورود بازیکنان، رتبه‌بندی ساخته می‌شود.</small></div>';return;}
   box.innerHTML=rows.map((x,i)=>`<div class="rankingRow"><div class="rankingPos">${toFaNumber(i+1)}</div><div><div class="rankingName">${escapeHtml(x.name)}${String(x.name)===String(chatPlayerName())?' ⭐':''}</div><span class="rankingMeta">لیگ ${toFaNumber(Number(x.league||8))} • آخرین بروزرسانی ${new Date(Number(x.updated||Date.now())).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'})}</span></div><div class="rankingOvr">${toFaNumber(Number(x.ovr||0))}<small style="display:block;font-size:9px;color:#8f899d">OVR</small></div></div>`).join('');
 }
@@ -2646,7 +2662,11 @@ function publishRanking(){
 function handleIncomingRanking(d){
   if(!d||!d.name)return;
   const key=rankingPlayerKey(d.name); const old=rankingRows[key];
-  if(!old || Number(d.updated||0)>=Number(old.updated||0)){rankingRows[key]=d;saveRankingCache();renderRanking();}
+  if(!old || Number(d.updated||0)>=Number(old.updated||0)){
+    rankingRows[key]=d;
+    saveRankingCache();
+    renderRanking();
+  }
 }
 function refreshRanking(){loadRankingCache();renderRanking();if(!chatSocket||chatSocket.readyState!==WebSocket.OPEN)connectChat();else publishRanking();const st=document.getElementById('rankingStatus');if(st)st.textContent='🟢 رتبه‌بندی آنلاین فعال است';}
 function closeRankingView(){const e=document.getElementById('rankingScreen');if(e)e.style.display='none';document.getElementById('rankingNav')?.classList.remove('active');}
@@ -4967,5 +4987,172 @@ button,input,select,textarea{font-weight:400!important}
 })();
 </script>
 
+<script id="real-player-weekly-league-v5">
+(function(){
+  /* ===== لیگ هفتگی خودکار: بازیکنان ثبت‌نام‌شده بازی، بدون نیاز به آنلاین بودن برای مسابقه ===== */
+  const RL_WEEK=7*24*60*60*1000;
+  const RL_LOCAL='morabivaik_weekly_league_state_v5';
+  const RL_VERSION=5;
+
+  function rlHash(str){
+    let h=2166136261>>>0; str=String(str);
+    for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}
+    return h>>>0;
+  }
+  function rlPlayerId(){
+    let id=localStorage.getItem('weeklyLeaguePlayerId');
+    if(!id){id='p_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9);localStorage.setItem('weeklyLeaguePlayerId',id)}
+    return id;
+  }
+  function rlJoinAt(){
+    let t=Number(localStorage.getItem('weeklyLeagueJoinAt')||0);
+    if(!t){t=Date.now();localStorage.setItem('weeklyLeagueJoinAt',String(t))}
+    return t;
+  }
+  function rlWeekId(ts=Date.now()){return Math.floor(Number(ts)/RL_WEEK)}
+  const rlOriginalGetLeagueState=window.getLeagueState;
+  function rlLevel(){try{const g=typeof rlOriginalGetLeagueState==='function'?rlOriginalGetLeagueState():null;return Math.max(0,Math.min(8,Number(g?.level??8)||8))}catch(e){return 8}}
+  function rlCurrentIdentity(){try{const fn=typeof window.chatPlayerName==='function'?window.chatPlayerName:null;return String(fn?fn():(localStorage.getItem('coachUser')||'مربی')).trim()||'مربی'}catch(e){return String(localStorage.getItem('coachUser')||'مربی').trim()||'مربی'}}
+  function rlTeamSnapshot(){
+    let ovr=60,atk=60,mid=60,def=60;
+    try{ovr=Math.round(Number(getTeamOverall()||60));const st=getTeamStats();atk=Math.round(Number(st.atk||ovr));mid=Math.round(Number(st.mid||ovr));def=Math.round(Number(st.def||ovr))}catch(e){}
+    return {ovr:Math.max(1,ovr),atk,mid,def};
+  }
+  function rlOwnPlayer(){
+    const id=rlPlayerId(),name=rlCurrentIdentity(),joinAt=rlJoinAt(),snap=rlTeamSnapshot();
+    return {id,name,ovr:snap.ovr,atk:snap.atk,mid:snap.mid,def:snap.def,joinAt,updated:Date.now(),league:rlLevel()};
+  }
+  function rlRankingPool(){
+    const pool=[];
+    try{
+      if(typeof rankingRows==='object'&&rankingRows){
+        Object.values(rankingRows).forEach(x=>{if(x&&x.name)pool.push({
+          id:'rank_'+rankingPlayerKey(x.name),name:String(x.name),ovr:Number(x.ovr||60),atk:Number(x.atk||x.ovr||60),mid:Number(x.mid||x.ovr||60),def:Number(x.def||x.ovr||60),joinAt:Number(x.joinAt||x.updated||Date.now()),updated:Number(x.updated||Date.now()),league:Number(x.league||rlLevel())
+        })});
+      }
+    }catch(e){}
+    const me=rlOwnPlayer();
+    const mi=pool.findIndex(x=>String(x.name)===String(me.name));
+    if(mi>=0)pool[mi]={...pool[mi],...me,id:me.id};else pool.push(me);
+    const seen=new Set();
+    return pool.filter(x=>{const k=String(x.name).trim();if(!k||seen.has(k))return false;seen.add(k);return true})
+      .sort((a,b)=>Number(a.joinAt||0)-Number(b.joinAt||0)||String(a.name).localeCompare(String(b.name),'fa'));
+  }
+  function rlPairRounds(ids){
+    const base=ids.slice(),rounds=[];
+    for(let r=0;r<9;r++){
+      const arr=base.slice(),pairs=[];
+      for(let i=0;i<5;i++)pairs.push([arr[i],arr[arr.length-1-i]]);
+      rounds.push(pairs);
+      const fixed=arr[0],rest=arr.slice(1);rest.unshift(rest.pop());base.splice(0,base.length,fixed,...rest);
+    }
+    const extra=[rounds[4],rounds[5],rounds[6],rounds[7],rounds[8]];
+    for(let i=0;i<5;i++)rounds.push(extra[i].map(([a,b],j)=>j%2?[b,a]:[a,b]));
+    return rounds;
+  }
+  function rlFirstSlotAfter(ts){
+    const d=new Date(Number(ts)||Date.now());d.setSeconds(0,0);
+    const candidates=[14,21].map(h=>{const x=new Date(d);x.setHours(h,0,0,0);return x.getTime()}).filter(x=>x>Number(ts));
+    if(candidates.length)return Math.min(...candidates);
+    const x=new Date(d);x.setDate(x.getDate()+1);x.setHours(14,0,0,0);return x.getTime();
+  }
+  function rlStateBuild(){
+    const all=rlRankingPool(),me=rlOwnPlayer();
+    const level=rlLevel(),same=all.filter(x=>Number(x.league||level)===level);
+    let pos=same.findIndex(x=>x.id===me.id); if(pos<0)pos=same.findIndex(x=>x.name===me.name);
+    if(pos<0){same.push(me);same.sort((a,b)=>Number(a.joinAt||0)-Number(b.joinAt||0)||String(a.name).localeCompare(String(b.name),'fa'));pos=same.findIndex(x=>x.id===me.id)}
+    const groupIndex=Math.floor(Math.max(0,pos)/10),players=same.slice(groupIndex*10,groupIndex*10+10);
+    const ready=players.length===10;
+    const anchor=ready?Math.max(...players.map(x=>Number(x.joinAt||x.updated||Date.now()))):Date.now();
+    const start=ready?rlFirstSlotAfter(anchor):0;
+    const startHour=start?new Date(start).getHours():0;
+    return {version:RL_VERSION,week:rlWeekId(),level,groupIndex,playerId:me.id,players,rounds:rlPairRounds(players.map(x=>x.id)),start,startHour,totalGames:14,completed:0,rewarded:false};
+  }
+  function rlLoad(){try{const x=JSON.parse(localStorage.getItem(RL_LOCAL)||'null');return x&&x.version===RL_VERSION?x:null}catch(e){return null}}
+  function rlSave(st){try{localStorage.setItem(RL_LOCAL,JSON.stringify(st))}catch(e){}}
+  function rlState(){
+    const me=rlOwnPlayer(),week=rlWeekId(),level=rlLevel();let st=rlLoad();
+    if(!st||Number(st.week)!==week||Number(st.level)!==level||String(st.playerId)!==String(me.id)){st=rlStateBuild();rlSave(st);return st}
+    const all=rlRankingPool().filter(x=>Number(x.league||level)===level);
+    const pos=Math.max(0,all.findIndex(x=>x.id===me.id||x.name===me.name));
+    const groupIndex=Number(st.groupIndex)||Math.floor(pos/10),fresh=all.slice(groupIndex*10,groupIndex*10+10);
+    if(fresh.length!==st.players.length||fresh.some((x,i)=>String(x.id)!==String(st.players[i]?.id))){st.players=fresh;st.rounds=rlPairRounds(fresh.map(x=>x.id));st.ready=fresh.length===10;if(st.ready&&!st.start){st.start=rlFirstSlotAfter(Math.max(...fresh.map(x=>Number(x.joinAt||x.updated||Date.now()))));st.startHour=new Date(st.start).getHours()}}
+    st.groupIndex=groupIndex;st.ready=st.players.length===10;
+    if(st.ready)st.rounds=rlPairRounds(st.players.map(x=>x.id));
+    rlSave(st);return st;
+  }
+  function rlSeedResult(a,b,round,week,level){
+    const seed=rlHash([week,level,round,a.id,b.id,a.ovr,b.ovr,a.atk,a.mid,a.def,b.atk,b.mid,b.def].join('|'));let x=seed||1;
+    const rnd=()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296};
+    const powerA=Number(a.atk||a.ovr)*.42+Number(a.mid||a.ovr)*.30+Number(a.def||a.ovr)*.28;
+    const powerB=Number(b.atk||b.ovr)*.42+Number(b.mid||b.ovr)*.30+Number(b.def||b.ovr)*.28;
+    const diff=Math.max(-35,Math.min(35,powerA-powerB)),xgA=Math.max(.25,1.25+diff*.035),xgB=Math.max(.25,1.25-diff*.035);
+    const poisson=lambda=>{let L=Math.exp(-lambda),p=1,k=0;do{k++;p*=rnd()}while(p>L&&k<7);return Math.max(0,Math.min(6,k-1))};
+    return [poisson(xgA),poisson(xgB)];
+  }
+  function rlTable(st){
+    const map={};st.players.forEach(p=>map[p.id]={...p,p:0,w:0,d:0,l:0,gf:0,ga:0,form:[]});
+    (st.rounds||[]).forEach((pairs,r)=>pairs.forEach(([ia,ib])=>{const a=map[ia],b=map[ib];if(!a||!b)return;const z=rlSeedResult(a,b,r,st.week,st.level),ga=z[0],gb=z[1];a.gf+=ga;a.ga+=gb;b.gf+=gb;b.ga+=ga;if(ga>gb){a.w++;a.p+=3;b.l++;a.form.unshift('W');b.form.unshift('L')}else if(gb>ga){b.w++;b.p+=3;a.l++;a.form.unshift('L');b.form.unshift('W')}else{a.d++;b.d++;a.p++;b.p++;a.form.unshift('D');b.form.unshift('D')}}));
+    Object.values(map).forEach(x=>x.form=x.form.slice(0,5));
+    return Object.values(map).sort((a,b)=>(b.p-a.p)||((b.gf-b.ga)-(a.gf-a.ga))||(b.gf-a.gf)||String(a.name).localeCompare(String(b.name),'fa'));
+  }
+  function rlMyPair(st,r){const id=st.playerId;for(const pair of st.rounds?.[r]||[])if(pair.includes(id))return pair;return null}
+  function rlMatchTime(st,r){
+    if(!st.start)return 0;
+    const d=new Date(Number(st.start));
+    const h=Number(st.startHour||d.getHours());
+    let day,slotHour;
+    if(h>=21){day=Math.floor((r+1)/2);slotHour=(r%2===0?21:14)}
+    else {day=Math.floor(r/2);slotHour=(r%2===0?14:21)}
+    d.setDate(d.getDate()+day);d.setHours(slotHour,0,0,0);return d.getTime();
+  }
+  function rlProcess(){
+    const st=rlState();if(!st.ready||!st.start)return st;let done=0;
+    for(let r=0;r<14;r++)if(rlMatchTime(st,r)<=Date.now())done=r+1;
+    if(done!==st.completed)st.completed=done;
+    if(done>=14&&!st.rewarded){const table=rlTable(st),rank=table.findIndex(x=>x.id===st.playerId)+1;st.rewarded=true;st.finalRank=rank;st.finalTable=table;if(rank===1){try{addGems(250);const bal=Number(localStorage.getItem('coachMoney')||0)+1000000;localStorage.setItem('coachMoney',String(bal));updateAllMoneyDisplays();alert('🏆 قهرمان لیگ شدی! ۲۵۰ جم + ۱٬۰۰۰٬۰۰۰ سکه دریافت کردی.')}catch(e){}}}
+    rlSave(st);return st;
+  }
+  function rlTimeText(ms){if(ms<=0)return '00:00:00';let sec=Math.floor(ms/1000),d=Math.floor(sec/86400);sec%=86400;let h=Math.floor(sec/3600);sec%=3600;let m=Math.floor(sec/60);sec%=60;return (d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
+  function rlClock(ts){return new Date(Number(ts)).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false})}
+  function rlDate(ts){return new Date(Number(ts)).toLocaleDateString('fa-IR')}
+  function rlRender(){
+    const st=rlProcess(),box=document.getElementById('leagueRows');if(!box)return;
+    const title=document.querySelector('#leagueScreen .leagueTitle');if(title)title.textContent='🏆 لیگ هفتگی';
+    const sub=document.querySelector('#leagueScreen .leagueSub');if(sub)sub.innerHTML='۱۰ بازیکن ثبت‌نام‌شده • هر روز <b>۲ بازی</b> • مدت لیگ <b>۷ روز</b> • حریف لازم نیست آنلاین باشد.';
+    const badge=document.getElementById('leagueBadge');if(badge)badge.innerHTML='لیگ '+toFaNumber(st.level)+'<br>'+ (st.ready?'۱۰ / ۱۰ بازیکن':'در انتظار تکمیل ۱۰ بازیکن');
+    const games=document.getElementById('leagueGames');if(games)games.textContent=toFaNumber(st.completed)+' / ۱۴';
+    if(!st.ready){box.innerHTML='<div class="leagueRow" style="grid-template-columns:1fr;padding:22px;text-align:center"><b>⏳ در حال تکمیل لیگ</b><small style="display:block;color:#777;margin-top:6px">بازیکنان ثبت‌نام‌شده به‌صورت خودکار وارد گروه‌های ۱۰ نفره می‌شوند؛ آنلاین بودن هم‌زمان لازم نیست.</small></div>';const timer=document.getElementById('leagueCountdown');if(timer)timer.textContent='در انتظار تکمیل';const slot=document.getElementById('leagueNextSlot');if(slot)slot.textContent='گروه شما: '+toFaNumber(st.players.length)+' / ۱۰';return}
+    const table=rlTable(st),me=table.find(x=>x.id===st.playerId)||table.find(x=>x.name===rlCurrentIdentity())||table[0],rank=table.findIndex(x=>x.id===me.id)+1;
+    const pts=document.getElementById('leaguePoints');if(pts)pts.textContent=toFaNumber(me.p);const rankEl=document.getElementById('leagueRank');if(rankEl)rankEl.textContent=toFaNumber(rank);
+    box.innerHTML=table.map((t,i)=>{const gd=t.gf-t.ga,form=(t.form||[]).map(x=>x==='W'?'🟢':x==='D'?'🟡':'🔴').join('');return '<div class="leagueRow '+(t.id===st.playerId?'user':'')+'"><span>'+toFaNumber(i+1)+'</span><span class="leagueTeam">'+escapeHtml(t.name)+(t.id===st.playerId?' ⭐':'')+'</span><span>'+toFaNumber(t.w+t.d+t.l)+'</span><span>'+toFaNumber(t.d)+'</span><span>'+(gd>0?'+':'')+toFaNumber(gd)+'</span><span class="leaguePts">'+toFaNumber(t.p)+'</span><span>'+form+'</span></div>'}).join('');
+    const pair=rlMyPair(st,Math.min(13,st.completed)),oppId=pair?(pair[0]===st.playerId?pair[1]:pair[0]):null,opp=st.players.find(x=>x.id===oppId);const on=document.getElementById('leagueOppName');if(on)on.textContent=opp?opp.name:'پایان لیگ';const oo=document.getElementById('leagueOppOvr');if(oo)oo.textContent=opp?'OVR '+toFaNumber(opp.ovr):'—';const mo=document.getElementById('leagueMyOvr');if(mo)mo.textContent='OVR '+toFaNumber(me.ovr);
+    const nextRound=st.completed,timer=document.getElementById('leagueCountdown');if(timer)timer.textContent=nextRound<14?rlTimeText(rlMatchTime(st,nextRound)-Date.now()):'لیگ تمام شد';const slot=document.getElementById('leagueNextSlot');if(slot)slot.textContent=nextRound<14?'بازی '+toFaNumber(nextRound+1)+' از ۱۴ • '+rlDate(rlMatchTime(st,nextRound))+' • '+rlClock(rlMatchTime(st,nextRound)):'۱۴ بازی به پایان رسید';
+    const rewards=document.getElementById('leagueRewards');if(rewards)rewards.innerHTML='<div class="leagueReward"><span>🥇 قهرمان</span><b>۲۵۰ ◆ + ۱٬۰۰۰٬۰۰۰ 🪙</b></div><div class="leagueReward"><span>📅 مدت</span><b>۷ روز</b></div><div class="leagueReward"><span>⚽ بازی هر روز</span><b>۲ مسابقه</b></div>';
+    const sc=document.getElementById('leagueScorers');if(sc)sc.innerHTML='<div style="padding:13px;text-align:center;color:#76550d">👥 لیگ از بازیکنان ثبت‌نام‌شده بازی ساخته می‌شود.<br><small>بازی‌ها طبق زمان‌بندی مشترک محاسبه می‌شوند؛ آفلاین بودن حریف مانع انجام مسابقه نیست.</small></div>';
+    const sr=document.getElementById('leagueScheduleRows');if(sr)sr.innerHTML=Array.from({length:14},(_,r)=>{const p=rlMyPair(st,r),a=p?st.players.find(x=>x.id===p[0]):null,b=p?st.players.find(x=>x.id===p[1]):null,mine=p&&p.includes(st.playerId),done=r<st.completed;let score='—';if(done&&a&&b){const z=rlSeedResult(a,b,r,st.week,st.level);score=mypoint(a,b,z,st.playerId)}return '<div class="leagueFixture '+(r===st.completed?'next':'')+'"><div class="time"><b>بازی '+toFaNumber(r+1)+'</b><small>'+rlDate(rlMatchTime(st,r))+'</small><small class="leagueEnglishTime">⏰ '+rlClock(rlMatchTime(st,r))+'</small></div><div class="opp">'+(mine?(a.id===st.playerId?'شما':'حریف'):'بازی لیگ')+' <span>vs</span> '+(mine?(b.id===st.playerId?a.name:b.name):(a?a.name:'—')+' / '+(b?b.name:'—'))+'<small>'+(done?'✅ انجام شد':r===st.completed?'⏰ بازی بعدی':'🔒 آینده')+'</small></div><div class="score">'+score+'</div></div>'}).join('');
+    const notice=document.getElementById('leagueAwardNotice');if(notice)notice.innerHTML=st.completed>=14?'<div class="leagueSeasonAward">🏁 لیگ تمام شد • رتبه شما: <b>'+toFaNumber(st.finalRank||rank)+'</b>'+(rank===1?' • 🏆 ۲۵۰ جم + ۱٬۰۰۰٬۰۰۰ سکه':'')+'</div>':'<div class="leagueSeasonAward">🔄 لیگ بدون نیاز به آنلاین بودن حریف اجرا می‌شود.</div>';
+  }
+  function mypoint(a,b,z,id){return String(a.id)===String(id)?z[0]+' - '+z[1]:z[1]+' - '+z[0]}
+  window.getLeagueState=function(){
+    const st=rlState();
+    return {level:st.level,season:st.week,game:st.completed,totalGames:14,nextSlot:st.ready&&st.completed<14?rlMatchTime(st,st.completed):0,teams:rlTable(st).map((x,i)=>({id:x.id===st.playerId?0:i+1,name:x.name,ovr:x.ovr,p:x.p,w:x.w,d:x.d,l:x.l,gf:x.gf,ga:x.ga,form:x.form})),schedule:Array.from({length:14},(_,i)=>({game:i+1,time:st.start?rlMatchTime(st,i):0,opponent:(()=>{const q=rlMyPair(st,i),oid=q?(q[0]===st.playerId?q[1]:q[0]):null;return st.players.find(x=>x.id===oid)?.name||'—'})(),score:i<st.completed?(()=>{const q=rlMyPair(st,i);if(!q)return null;const a=st.players.find(x=>x.id===q[0]),b=st.players.find(x=>x.id===q[1]);if(!a||!b)return null;const z=rlSeedResult(a,b,i,st.week,st.level);return q[0]===st.playerId?z.join(' - '):z.reverse().join(' - ')})():null}))};
+  };
+  window.renderLeague=rlRender;
+  window.processLeagueDue=function(){rlProcess();rlRender()};
+  window.startLeagueTimer=function(){if(leagueTimerInterval)clearInterval(leagueTimerInterval);rlRender();leagueTimerInterval=setInterval(()=>{try{rlProcess();rlRender()}catch(e){}},1000)};
+  window.finishLeagueSeason=function(){};
+  window.simulateLeagueSlot=function(){};
+  document.addEventListener('DOMContentLoaded',()=>{try{rlRender()}catch(e){}});
+})();
+</script>
+<style id="real-player-weekly-league-v5-style">
+#game .leagueScreen .leagueHead{border-color:#d8ad3e!important;background:linear-gradient(135deg,#fff8dd,#ffffff 58%,#eefaf5)!important}
+#game .leagueScreen .leagueTitle{font-weight:900!important;letter-spacing:0}
+#game .leagueScreen .leagueBadge{box-shadow:0 8px 22px rgba(170,120,20,.18),inset 0 1px #fff8b0!important}
+#game .leagueScreen .leagueRow.user{outline:2px solid rgba(16,184,135,.22)}
+#game .leagueScreen .leagueSeasonAward{font-weight:800}
+#game .leagueScreen .leagueEnglishTime,#game .leagueScreen .leagueEnglishTime b,#game .leagueScreen #leagueCountdown,#game .leagueScreen #leagueNextSlot{font-family:Arial,Tahoma,sans-serif!important;font-weight:400!important;letter-spacing:0!important;font-variant-numeric:normal!important}
+</style>
 </body>
 </html>
