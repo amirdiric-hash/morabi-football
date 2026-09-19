@@ -2657,34 +2657,66 @@ function buyTransferPlayer(listingId){
 }
 function showTransferPlayer(listingId){const x=transferListings[listingId];if(!x)return;alert('👤 '+x.player.name+'\nOVR: '+x.player.ovr+'\nقدرت: '+(x.player.power||x.player.ovr)+'\nسن: '+x.player.age+'\nپست: '+posLabel(x.player.pos)+'\nفروشنده: '+x.seller+'\nقیمت: '+x.price+'M');}
 function handleIncomingTransferListing(topic,d,raw){const key=transferListingKey(topic);if(!raw){delete transferListings[key];transferSaveCache();renderTransferMarket();return;}if(d&&d.listingId){const r=normalizeTransferListing(d);transferListings[key]=r.x;transferSaveCache();if(r.changed&&String(d.seller)===String(chatPlayerName())&&chatSocket&&chatSocket.readyState===WebSocket.OPEN)publishTransferListing(r.x);renderTransferMarket();}}
+/* ===== پرداخت فروش بازیکن: هر فروش فقط یک‌بار (اعلان + واریز) ===== */
+const TRANSFER_PAID_KEY='morabivaik_transfer_paid_v2';
+const transferPaidSession=new Set();
+function transferPaidLoad(){try{const o=JSON.parse(localStorage.getItem(TRANSFER_PAID_KEY)||'{}');return(o&&typeof o==='object')?o:{}}catch(e){return{}}}
+function transferPaidHas(k){return transferPaidSession.has(k)||!!transferPaidLoad()[k]||!!transferProcessed[k]}
+function transferPaidMark(k){
+  transferPaidSession.add(k);
+  try{
+    const o=transferPaidLoad();o[k]=Date.now();
+    const keys=Object.keys(o);
+    if(keys.length>500)keys.sort((a,b)=>o[a]-o[b]).slice(0,keys.length-500).forEach(x=>delete o[x]);
+    localStorage.setItem(TRANSFER_PAID_KEY,JSON.stringify(o));
+    return !!transferPaidLoad()[k];
+  }catch(e){return false}
+}
+// پیام فروش روی سرور «ماندگار» است؛ بعد از دریافت پولش آن را از سرور پاک می‌کنیم
+// تا در ورودهای بعدی (یا روی دستگاه دیگر) دوباره برنگردد.
+function transferAckSale(topic){
+  try{if(chatSocket&&chatSocket.readyState===WebSocket.OPEN){chatSocket.send(mqttPublishPacket(topic,'',true));return true}}catch(e){}
+  return false;
+}
 function handleIncomingTransferSale(topic,d,raw){
   if(!d||!d.listingId)return;
-  // Load the persistent transaction cache BEFORE checking whether this sale was already processed.
-  // This prevents a retained MQTT sale message from showing the seller's confirmation again after refresh.
   transferLoadCache();
   const id=d.listingId;
   const txKey=String(d.txId||id);
-  const already=!!transferProcessed[txKey];
-  transferSold[id]=d;
+  const isSeller=String(d.seller)===String(chatPlayerName());
+  const already=transferPaidHas(txKey);
+  // کش سبک (فقط اطلاعات لازم) تا حافظه مرورگر پر نشود
+  transferSold[id]={listingId:id,txId:d.txId,seller:d.seller,buyer:d.buyer,price:d.price,time:d.time};
+  const soldKeys=Object.keys(transferSold);
+  if(soldKeys.length>100)soldKeys.sort((a,b)=>Number(transferSold[a].time||0)-Number(transferSold[b].time||0)).slice(0,soldKeys.length-100).forEach(k=>delete transferSold[k]);
   delete transferListings[id];
-  transferProcessed[txKey]=transferProcessed[txKey]||Date.now();
   transferSaveCache();
-  // The sale is authoritative on the shared MQTT transfer topic. Apply the seller-side state exactly once.
-  if(String(d.seller)===String(chatPlayerName())&&!already){
-    const soldPlayer=d.player||{};
-    const mine=roster.find(p=>String(p.id)===String(soldPlayer.id)||String(p.name)===String(soldPlayer.name));
+  if(!isSeller)return;
+  // این فروش قبلاً پرداخت شده؛ فقط پیام قدیمی را از سرور پاک کن (بدون اعلان و بدون پول)
+  if(already){transferAckSale(topic);return;}
+  // اول قفل داخل حافظه (جلوی پیام تکراری در همین لحظه)، بعد واریز، بعد ثبت دائمی + پاک‌کردن از سرور
+  transferPaidSession.add(txKey);
+  const price=Number(d.price||0);
+  try{
+    if(Number.isFinite(price)&&price>0){
+      const current=Number(localStorage.getItem('coachMoney')||0);
+      localStorage.setItem('coachMoney',String(current+price));
+    }
+  }catch(e){transferPaidSession.delete(txKey);return;} // واریز نشد؛ پیام از سرور پاک نمی‌شود و بعداً دوباره تلاش می‌شود
+  transferPaidMark(txKey);
+  transferAckSale(topic);
+  const soldPlayer=d.player||{};
+  try{
+    const mine=roster.find(p=>String(p.id)===String(soldPlayer.id))||roster.find(p=>String(p.name)===String(soldPlayer.name)&&String(p.nat||'')===String(soldPlayer.nat||''));
     if(mine){
       roster=roster.filter(p=>String(p.id)!==String(mine.id));
       saveRoster();
       try{normalizeLineup();saveLineup();}catch(e){}
-      // Publish the updated ranking immediately so the shared server state reflects the sale.
       try{publishRanking();}catch(e){}
     }
-    const current=Number(localStorage.getItem('coachMoney')||0);
-    localStorage.setItem('coachMoney',String(current+Number(d.price||0)));
-    updateAllMoneyDisplays();
-    alert('💰 بازیکن '+(soldPlayer.name||'بازیکن')+' به '+d.buyer+' فروخته شد و '+Number(d.price||0).toLocaleString('fa-IR')+'M به موجودی اضافه شد.');
-  }
+  }catch(e){}
+  try{updateAllMoneyDisplays();}catch(e){}
+  setTimeout(()=>alert('💰 بازیکن '+(soldPlayer.name||'بازیکن')+' به '+d.buyer+' فروخته شد و '+price.toLocaleString('fa-IR')+'M به موجودی اضافه شد.'),60);
 }
 function refreshTransferMarket(){transferLoadCache();renderTransferMarket();if(!chatSocket||chatSocket.readyState!==WebSocket.OPEN)connectChat();const st=document.getElementById('transferStatus');if(st)st.textContent='🟢 بازار نقل‌وانتقالات آنلاین فعال است';}
 function openTransferMarket(){
