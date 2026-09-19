@@ -1434,7 +1434,7 @@ html, body {
 
 
 <section id="chatScreen" class="chatScreen">
-  <div class="chatHead"><div><b>💬 چت بازیکنان</b><div class="chatStatus" id="chatStatus">آماده برای اتصال آنلاین</div></div><button onclick="clearChatMessages()" style="border:1px solid #51485f;background:#171421;color:#bbb;border-radius:12px;padding:8px 10px;font-family:inherit">پاک کردن</button></div>
+  <div class="chatHead"><div><b>💬 چت بازیکنان</b><div class="chatStatus" id="chatStatus">آماده برای اتصال آنلاین</div></div></div>
   <div class="chatNotice">با اتصال اینترنت، پیام‌ها به‌صورت زنده بین بازیکنان آنلاین ردوبدل می‌شوند.</div>
   <div class="chatBox"><div id="chatMessages" class="chatMessages"><div class="chatEmpty" id="chatEmpty">💬<br><b>هنوز پیامی نیست</b><br><small>اولین پیام را بفرست.</small></div></div><div class="chatComposer"><input id="chatInput" maxlength="300" placeholder="پیامت را بنویس..." onkeydown="if(event.key==='Enter')sendChatMessage()"><button onclick="sendChatMessage()">ارسال</button></div></div>
 </section>
@@ -1870,24 +1870,31 @@ const defaultRoster = [
   {id:20,name:"سعیدی",pos:"DEF",age:20,ovr:72,power:72,nat:"ایران",flag:"🇮🇷",price:31.6}
 ];
 
-// شروع نسخه نهایی از صفر: فقط یک‌بار، در اولین اجرای v19، پول و تیم به حالت ابتدایی برمی‌گردد.
-if(localStorage.getItem('coachFreshStartV23')!=='1'){
-  localStorage.removeItem('coachRoster');
-  localStorage.removeItem('coachLineup');
+// ریست کامل بازیکنان: هیچ اطلاعاتی از بازیکنان/قراردادهای قبلی باقی نماند.
+// بازیکنان برند و اسطوره فقط به‌عنوان گزینه‌های قابل قرارداد باقی می‌مانند؛
+// تمام قراردادهای فعال و بازیکنان خریداری‌شده/ذخیره‌شده قبلی لغو و پاک می‌شوند.
+if(localStorage.getItem('coachFreshStartV25')!=='1'){
+  [
+    'coachRoster','coachLineup','coachMarketPlayers','coachMarketRefreshAt',
+    'coachMarketPricingV3','coachRecruitOffers','coachTrainingSessions','coachContracts',
+    'marketData','marketLastRefresh','lastOpponentName','matchHistory',
+    'coachFormation','coachTactic','coachPress','weeklyLeaguePlayerId',
+    'morabivaik_transfer_cache_v1','morabivaik_transfer_sold_v1',
+    'morabivaik_transfer_processed_v1','morabivaik_transfer_paid_v2',
+    'morabivaik_ranking_cache_v1'
+  ].forEach(k=>localStorage.removeItem(k));
+  // پاک‌سازی کلیدهای بازیکنی/قراردادی احتمالی نسخه‌های قدیمی
+  Object.keys(localStorage).forEach(k=>{
+    const x=String(k).toLowerCase();
+    if(x.includes('contract') || x.includes('roster') || x.includes('lineup') ||
+       x.includes('marketplayer') || x.includes('transfer_') || x.includes('training') ||
+       x.includes('playercache') || x.includes('player_cache')) localStorage.removeItem(k);
+  });
   localStorage.setItem('coachMoney','100000');
   localStorage.setItem('coachGems','50');
   localStorage.removeItem('fanPoints');
   localStorage.removeItem('fans');
-  localStorage.removeItem('matchHistory');
-  localStorage.removeItem('coachMarketPlayers');
-  localStorage.removeItem('coachMarketRefreshAt');
-  localStorage.removeItem('lastOpponentName');
-  localStorage.removeItem('coachFormation');
-  localStorage.removeItem('coachTactic');
-  localStorage.removeItem('coachPress');
-  localStorage.removeItem('marketData');
-  localStorage.removeItem('marketLastRefresh');
-  localStorage.setItem('coachFreshStartV23','1');
+  localStorage.setItem('coachFreshStartV25','1');
 }
 if(!localStorage.getItem('coachAgeSystemV1')){localStorage.setItem('coachAgeSystemV1','1');localStorage.setItem('coachAgeTickAt',String(Date.now()));localStorage.setItem('coachLastGemAt',String(Date.now()));}
 // ارز اولیه نسخه جدید: فقط اگر موجودی قدیمی صفر/خالی است، مقدار شروع جدید اعمال شود.
