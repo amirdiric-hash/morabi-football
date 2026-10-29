@@ -624,12 +624,12 @@ v.innerHTML=V[tab]();
 navR();cd();
 if(S.sum){const s=S.sum;S.sum=0;om(`<div style="text-align:center"><div style="font-size:46px">${s.nt>s.tier?'🎉':s.nt<s.tier?'😞':'📅'}</div><h3>پایان فصل ${fa(s.season)}</h3><p>رده ${fa(s.pos)} در ${DIV[s.tier]}${s.nt>s.tier?'<br><b class="win">صعود به '+DIV[s.nt]+'!</b>':s.nt<s.tier?'<br><b class="lose">سقوط به '+DIV[s.nt]+'</b>':''}</p><p class="mu">پاداش فصل: 🪙 ${fa(s.prize)}${s.gone.length?'<br>قراردادشان تمام شد: '+s.gone.join('، '):''}${s.ad?'<br>'+fa(s.ad)+' بازیکن آزاد جایگزین شد':''}</p><button class="btn w" onclick="cm()">فصل جدید</button></div>`)}}
 function cd(){const e=$('#cd');if(e&&S&&S.lg&&S.lg.st=='run'){const s=Math.max(0,Math.ceil((mdAt(S.lg,S.lg.md)-Date.now())/1000));e.textContent=fa(Math.floor(s/3600))+':'+fa(Math.floor(s%3600/60)).padStart(2,'۰')+':'+fa(s%60).padStart(2,'۰')}}
-async function doAuth(m){const u=Net.normName($('#au').value),p=$('#ap').value;if(!u||!p)return toast('نام کاربری و رمز عبور را وارد کنید');const btns=document.querySelectorAll('.grid .btn');btns.forEach(b=>b.disabled=true);let e,cs=null,key=null;
+async function doAuth(m){const u=Net.normName($('#au').value),p=$('#ap').value;if(!u||!p)return toast('نام کاربری و رمز عبور را وارد کنید');const btns=document.querySelectorAll('.grid .btn');btns.forEach(b=>b.disabled=true);let e,cs=null,key=null,fresh=0;
 try{if(m){if(!Net.users()[u]&&u!==Net.normName('VAIK')){toast('در حال بررسی نام کاربری…');const g=await CLOUD.get(u);if(g.raws&&g.raws.length)e='این نام کاربری قبلاً ساخته شده است؛ با «ورود» وارد شو'}if(!e){e=await Net.reg(u,p);if(!e)key=await CLOUD.kd(u,p)}}
  else if(u===Net.normName('VAIK'))e='این نام کاربری رزرو شده است';
- else{const loc=Net.users()[u];if(loc&&loc!==hs(p))e='رمز عبور اشتباه است';else{toast('در حال بررسی حساب…');const r=await CLOUD.login(u,p,!!loc);if(r.err)e=r.err;else{key=r.key;cs=r.S}}}}
+ else{const loc=Net.users()[u];if(loc&&loc!==hs(p))e='رمز عبور اشتباه است';else{toast('در حال بررسی حساب…');const r=await CLOUD.login(u,p,!!loc);if(r.err)e=r.err;else{key=r.key;cs=r.S;fresh=r.fresh}}}}
 catch(err){e='خطایی رخ داد؛ دوباره تلاش کنید'}finally{btns.forEach(b=>b.disabled=false)}
-if(e)return toast(e);
+if(e)return toast(e);if(fresh)toast('این حساب ذخیره ابری نداشت؛ با همین رمز دوباره ساخته شد');
 try{const U=Net.users();U[u]=hs(p);localStorage.setItem('cu-v4',JSON.stringify(U))}catch(x){}
 try{localStorage.setItem('cs',u)}catch(x){}
 CLOUD.k=key;CLOUD.last='';CLOUD.tm=0;CLOUD.store(u,key);
@@ -653,7 +653,7 @@ async get(u){await Net.init();const t0=Date.now();while(!Net.connected&&Date.now
 async login(u,p,hasLocal){const key=await this.kd(u,p),g=await this.get(u);
  if(g.err)return hasLocal?{key,S:null}:{err:'برای ورود از دستگاه جدید باید به سرور وصل باشی؛ اینترنت را بررسی کن'};
  let best=null,bad=0;for(const raw of g.raws){try{const o=await this.unpack(key,raw);if(Net.normName(o.acc)===u&&(!best||(o.t||0)>(best.t||0)))best=o}catch(e){bad++}}
- if(best)return{key,S:best};if(hasLocal)return{key,S:null};
+ if(best)return{key,S:best};if(hasLocal)return{key,S:null};if(!bad&&Net.claims.user[u])return{key,S:null,fresh:1};
  return{err:bad?'رمز عبور اشتباه است':'حسابی با این نام پیدا نشد؛ اگر حساب جدید است «ثبت‌نام» کن'}},
 async up(f){if(!S||S.setup||!this.k||this.busy)return;const key=this.k,sig=S.t,acc=S.acc;if(!f&&this.last===sig)return;
  const copy=JSON.parse(JSON.stringify(S));copy.hist=(copy.hist||[]).slice(0,10);copy.inbox=(copy.inbox||[]).slice(0,15);this.busy=1;
@@ -663,6 +663,8 @@ tick(){if(Date.now()-this.tm>45000){this.tm=Date.now();this.up()}},
 async store(u,key){try{const r=await crypto.subtle.exportKey('raw',key);localStorage.setItem('ck4-'+u,b64c(new Uint8Array(r)))}catch(e){}},
 async restore(u){try{const t=localStorage.getItem('ck4-'+u);if(t)this.k=await crypto.subtle.importKey('raw',unb64(t),{name:'AES-GCM'},true,['encrypt','decrypt'])}catch(e){}}};
 Net.cloudRx=(t,x)=>{const f=Net.cw&&Net.cw[t];if(f&&x)f(x)};
+Net.poll=function(){if(!S||S.setup)return;const r=this.root+'/',me=S.acc,tp=[r+'deals/'+me,r+'deals/'+me+'/+',r+'admin/gift/'+encodeURIComponent(me)+'/+'];this.cl.forEach(st=>{if(st&&st.ok)try{st.c.unsubscribe(tp,()=>{try{st.c.subscribe(tp,{qos:1})}catch(e){}})}catch(e){}})};
+setInterval(()=>{try{Net.poll()}catch(e){}},15000);
 let MK=0;
 async function mkClub(){if(MK)return;const bad=/[<>&"'`\\]/g;const n=SU.name.replace(bad,'').replace(/\s+/g,' ').trim().slice(0,18);if(n.length<2)return toast('نام باشگاه را وارد کنید (حداقل ۲ حرف)');MK=1;toast('در حال بررسی نام باشگاه…');let r;try{r=await Net.reserve('club',n,S.acc)}catch(e){r=-1}MK=0;if(!S||!S.setup)return;if(r===0)return toast('این نام باشگاه قبلاً توسط مربی دیگری گرفته شده است؛ نام دیگری انتخاب کنید');const c=COLS[SU.ci];S.club={name:n,icon:SU.icon,shape:SU.shape,c1:c[0],c2:c[1],ac:c[2],kit:SU.kit,stad:(SU.stad.replace(bad,'').trim()||'ورزشگاه '+n).slice(0,24)};if(r===-1)S.club.pcl=1;S.setup=0;startClub(0,-4);addIn({ty:'info',txt:`🎉 خوش آمدید مربی! باشگاه ${n} در ${DIV[0]} شروع می‌کند. هدف: رده ۱۰ یا بالاتر و صعود تا لیگ برتر.`});save();render();if(r===-1)setTimeout(()=>toast('اتصال به سرور برقرار نیست؛ نام باشگاه بعداً ثبت می‌شود'),600)}
 function boot(){try{trSane(Net.online.transfers);lgSane(Net.online.leagues);Object.keys(Net.ranks).forEach(k=>{if(!rkOk(Net.ranks[k]))delete Net.ranks[k]});Net.persist('transfers');Net.persist('leagues');lsSet('mb-ranks-v4',Net.ranks)}catch(e){}const u=localStorage.getItem('cs');if(u){try{const j=localStorage.getItem(Net.key(u));if(j){S=JSON.parse(j);if(!S.setup)catchUp()}}catch(e){S=null}}if(u){Net.resub();CLOUD.restore(u)}render()}
@@ -737,5 +739,5 @@ boot();
 setInterval(()=>{if(!S||S.setup)return;cd();tickMD()},1000);
 setInterval(()=>{if(!S||S.setup)return;syncLg();pushSnap();contractCheck();lgRankSync();rkWatch();pubRank();CLOUD.tick()},5000);
 setInterval(()=>{if(!S||S.setup||S.fired)return;S.players.forEach(p=>p.en=Math.min(100,p.en+1+S.fac.doc));save();if($('#m').style.display!='flex'&&'lxo'.includes(tab))render()},30000);
-addEventListener('online',()=>Net.kick());document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible'&&S&&!S.setup){Net.kick();syncLg();tickMD()}});addEventListener('pagehide',()=>{try{save();Net.drain();CLOUD.up(1)}catch(e){}});
+addEventListener('online',()=>Net.kick());document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible'&&S&&!S.setup){Net.kick();Net.poll();syncLg();tickMD()}});addEventListener('pagehide',()=>{try{save();Net.drain();CLOUD.up(1)}catch(e){}});
 </script></body></html>
