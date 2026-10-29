@@ -204,7 +204,7 @@ const Net={mode:'',key:u=>'cp4-'+u,cl:[],client:null,connected:false,ready:null,
     n.g=n.g||{};n.g[lid]=r;n.tier=tier|0;this.tot(n);n.ts=Date.now();
     this.ranks[u]=n;lsSet('mb-ranks-v4',this.ranks);this.pub('state/rank/'+encodeURIComponent(String(u).slice(0,80)),n);return 1},
   pubRank(p,force){const h=stable({...p,ts:0});if(!force&&this.lastRank===h)return;this.lastRank=h;lsSet('mb-ranks-v4',this.ranks);this.pub('state/rank/'+encodeURIComponent(String(p.u).slice(0,80)),p)},
-  onMsg(i,topic,buf){const nw0=this.root+'/news/',gp0=this.root+'/admin/gift/';if(topic.startsWith(nw0)){admNewsRx(topic.slice(nw0.length),buf.toString());return}if(topic.startsWith(gp0)){admGiftRx(topic.slice(gp0.length),buf.toString());return}let d;try{d=clean(JSON.parse(buf.toString()))}catch(e){return}if(!d||typeof d!='object')return;const pre=this.root+'/',t=topic.startsWith(pre)?topic.slice(pre.length):'';
+  onMsg(i,topic,buf){const nw0=this.root+'/news/',gp0=this.root+'/admin/gift/';if(topic.startsWith(nw0)){admNewsRx(topic.slice(nw0.length),buf.toString());return}if(topic.startsWith(gp0)){admGiftRx(topic.slice(gp0.length),buf.toString());return}if(topic.startsWith(this.root+'/cloud/')){this.cloudRx&&this.cloudRx(topic,buf.toString());return}let d;try{d=clean(JSON.parse(buf.toString()))}catch(e){return}if(!d||typeof d!='object')return;const pre=this.root+'/',t=topic.startsWith(pre)?topic.slice(pre.length):'';
     if(t==='state/leagues'){if(this.recv('leagues',i,d)&&S&&!S.setup)syncLg()}
     else if(t==='state/transfers'){if(this.recv('transfers',i,d)&&S&&!S.setup&&tab==='m'&&SUB.m==='buy')render()}
     else if(t.startsWith('state/rank/')){let posted='';try{posted=decodeURIComponent(t.slice('state/rank/'.length))}catch(e){return}if(this.normName(posted)===this.normName(d.u))this.gotRank(d);}
@@ -559,7 +559,7 @@ m_on(){const d=transferState(),mine=d.listings.filter(x=>x.seller===S.acc);retur
 x(){return sg('x',[['pl','بازیکنان'],['hl','سالن تمرین'],['fc','امکانات و کادر']])+(SUB.x=='pl'?V.x_pl():SUB.x=='hl'?V.x_hl():V.x_fc())},
 x_pl(){const T=tdy(),left=tmax()-T.ids.length;return`<div class="card"><div class="hd">💪 تمرین روزانه</div><div class="row"><b>سهمیه امروز</b><span class="chip">${fa(left)} از ${fa(tmax())}</span></div><div class="bar v" style="margin:8px 0"><i style="width:${left*100/tmax()}%"></i></div><p class="mu" style="margin:0">هر روز حداکثر ${fa(tmax())} پارامتر (از هر بازیکنی که بخواهی) قابل تمرین است و سطح سالن تمرین این عدد را بالا می‌برد. هر مهارت هر بازیکن روزی یک بار. هزینه تمرین به قدرت بازیکن بستگی دارد (بازیکن قوی‌تر = گران‌تر). سهمیه هر روز ساعت ۰۰:۰۰ دوباره پر می‌شود. مهارت‌ها از پتانسیل بازیکن بالاتر نمی‌روند و مصدوم‌ها تمرین نمی‌کنند.</p></div><div class="card">${S.players.slice().sort((a,b)=>ov(b)-ov(a)).map(p=>plRow(p,(()=>{const n=T.ids.filter(x=>x==p.id).length;return (n?`<span class="pill">✅ ${fa(n)}</span>`:'')+`<button class="btn s" ${left<=0?'disabled':''} onclick="openP(${p.id})">💪 ${fa(trainCost(p))}</button>`})())).join('')}</div>`},
 x_fc(){return`<div class="card"><div class="hd">امکانات و کادر باشگاه</div>${FA.map(([k,ic,n,ds])=>{const lv=S.fac[k],c=2000*(lv+1)**2;return`<div class="fa"><div class="ic">${ic}</div><div style="flex:1"><b>${n}</b><div class="mu">${ds}</div><div class="lv">${[1,2,3,4,5].map(i=>`<i class="${i<=lv?'on':''}"></i>`).join('')}</div></div>${k=='acad'?`<button class="btn g s" onclick="youth()">جوان</button>`:''}<button class="btn y s" ${lv>=5?'disabled':''} onclick="upFac('${k}')">${lv>=5?'حداکثر':'🪙 '+fa(c)}</button></div>`}).join('')}<p class="mu">هزینه نگهداری: ${fa(fin(0).mt)} سکه در هر بازی</p></div>`},
-c_ac(){return`<div class="card"><div class="hd">حساب کاربری</div><p>کاربر: <b>${S.acc}</b></p><button class="btn r w" onclick="logout()">خروج از حساب</button></div>`}};
+c_ac(){return`<div class="card"><div class="hd">حساب کاربری</div><p>کاربر: <b>${S.acc}</b></p><p class="mu">☁️ ذخیره ابری: ${CLOUD.k?'فعال — با همین نام و رمز از هر گوشی وارد شو':'غیرفعال؛ یک بار خروج و ورود دوباره بزن تا فعال شود'}</p><button class="btn r w" onclick="logout()">خروج از حساب</button></div>`}};
 const allP=()=>[...S.players.map(p=>({n:p.n,t:S.club.name,g:p.g,a:p.a,me:1})),...S.lg.teams.filter(t=>!t.me).flatMap(t=>t.pl.map(p=>({n:p.n,t:t.name,g:p.g,a:p.a})))];
 // ===== رتبه‌بندی آنلاین مربیان =====
 const acctScore=()=>3*S.w+S.d-2*S.l+25*(S.trophies||[]).length+10*(S.runners||0);
@@ -624,11 +624,48 @@ v.innerHTML=V[tab]();
 navR();cd();
 if(S.sum){const s=S.sum;S.sum=0;om(`<div style="text-align:center"><div style="font-size:46px">${s.nt>s.tier?'🎉':s.nt<s.tier?'😞':'📅'}</div><h3>پایان فصل ${fa(s.season)}</h3><p>رده ${fa(s.pos)} در ${DIV[s.tier]}${s.nt>s.tier?'<br><b class="win">صعود به '+DIV[s.nt]+'!</b>':s.nt<s.tier?'<br><b class="lose">سقوط به '+DIV[s.nt]+'</b>':''}</p><p class="mu">پاداش فصل: 🪙 ${fa(s.prize)}${s.gone.length?'<br>قراردادشان تمام شد: '+s.gone.join('، '):''}${s.ad?'<br>'+fa(s.ad)+' بازیکن آزاد جایگزین شد':''}</p><button class="btn w" onclick="cm()">فصل جدید</button></div>`)}}
 function cd(){const e=$('#cd');if(e&&S&&S.lg&&S.lg.st=='run'){const s=Math.max(0,Math.ceil((mdAt(S.lg,S.lg.md)-Date.now())/1000));e.textContent=fa(Math.floor(s/3600))+':'+fa(Math.floor(s%3600/60)).padStart(2,'۰')+':'+fa(s%60).padStart(2,'۰')}}
-async function doAuth(m){const u=Net.normName($('#au').value),p=$('#ap').value;if(!u||!p)return toast('نام کاربری و رمز عبور را وارد کنید');const btns=document.querySelectorAll('.grid .btn');btns.forEach(b=>b.disabled=true);let e;try{e=m?await Net.reg(u,p):Net.log(u,p)}catch(err){e='خطایی رخ داد؛ دوباره تلاش کنید'}finally{btns.forEach(b=>b.disabled=false)}if(e)return toast(e);try{localStorage.setItem('cs',u)}catch(x){}const j=localStorage.getItem(Net.key(u));let ok=0;if(j){try{S=JSON.parse(j);ok=1}catch(x){}}if(!ok){S=blank(u);save()}if(!S.setup)catchUp();Net.resub();render()}
-function logout(){save();localStorage.removeItem('cs');S=null;render()}
+async function doAuth(m){const u=Net.normName($('#au').value),p=$('#ap').value;if(!u||!p)return toast('نام کاربری و رمز عبور را وارد کنید');const btns=document.querySelectorAll('.grid .btn');btns.forEach(b=>b.disabled=true);let e,cs=null,key=null;
+try{if(m){if(!Net.users()[u]&&u!==Net.normName('VAIK')){toast('در حال بررسی نام کاربری…');const g=await CLOUD.get(u);if(g.raws&&g.raws.length)e='این نام کاربری قبلاً ساخته شده است؛ با «ورود» وارد شو'}if(!e){e=await Net.reg(u,p);if(!e)key=await CLOUD.kd(u,p)}}
+ else if(u===Net.normName('VAIK'))e='این نام کاربری رزرو شده است';
+ else{const loc=Net.users()[u];if(loc&&loc!==hs(p))e='رمز عبور اشتباه است';else{toast('در حال بررسی حساب…');const r=await CLOUD.login(u,p,!!loc);if(r.err)e=r.err;else{key=r.key;cs=r.S}}}}
+catch(err){e='خطایی رخ داد؛ دوباره تلاش کنید'}finally{btns.forEach(b=>b.disabled=false)}
+if(e)return toast(e);
+try{const U=Net.users();U[u]=hs(p);localStorage.setItem('cu-v4',JSON.stringify(U))}catch(x){}
+try{localStorage.setItem('cs',u)}catch(x){}
+CLOUD.k=key;CLOUD.last='';CLOUD.tm=0;CLOUD.store(u,key);
+let L=null;try{const j=localStorage.getItem(Net.key(u));if(j)L=JSON.parse(j)}catch(x){}
+S=(cs&&(!L||(cs.t||0)>(L.t||0)))?cs:L;if(!S)S=blank(u);S.acc=u;save();if(!S.setup)catchUp();Net.resub();render()}
+function logout(){save();CLOUD.up(1);try{localStorage.removeItem('ck4-'+S.acc)}catch(e){}CLOUD.k=null;localStorage.removeItem('cs');S=null;render()}
+
+// ===== ذخیره ابری رمزنگاری‌شده (حساب با هر گوشی باز می‌شود) =====
+const b64c=u=>{let t='';for(let i=0;i<u.length;i+=8192)t+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(t)};
+const CLOUD={k:null,busy:0,last:'',tm:0,
+async kd(u,p){const e=new TextEncoder(),b=await crypto.subtle.importKey('raw',e.encode(p),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('mb4|'+Net.normName(u)),iterations:60000,hash:'SHA-256'},b,{name:'AES-GCM',length:256},true,['encrypt','decrypt'])},
+async tid(u){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mb4cloud|'+Net.normName(u)));return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('')},
+async pack(key,obj){let raw=new TextEncoder().encode(JSON.stringify(obj)),z=0;if(window.CompressionStream){try{const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(raw);w.close();raw=new Uint8Array(await new Response(cs.readable).arrayBuffer());z=1}catch(e){z=0;raw=new TextEncoder().encode(JSON.stringify(obj))}}
+ const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,raw));return JSON.stringify({v:1,z,ts:Date.now(),iv:b64c(iv),ct:b64c(ct)})},
+async unpack(key,raw){const j=JSON.parse(raw);if(!j||j.v!==1||typeof j.iv!='string'||typeof j.ct!='string')throw 0;let pt=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(j.iv)},key,unb64(j.ct)));
+ if(j.z){const ds=new DecompressionStream('gzip'),w=ds.writable.getWriter();w.write(pt);w.close();pt=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+ const o=JSON.parse(new TextDecoder().decode(pt));if(!o||typeof o!='object'||typeof o.acc!='string')throw 0;return o},
+async get(u){await Net.init();const t0=Date.now();while(!Net.connected&&Date.now()-t0<6000)await new Promise(r=>setTimeout(r,200));if(!Net.connected)return{err:1};
+ const tp=Net.root+'/cloud/'+await this.tid(u),raws=[];Net.cw=Net.cw||{};Net.cw[tp]=x=>raws.push(x);Net.cl.forEach(st=>{if(st&&st.ok)try{st.c.subscribe(tp,{qos:1})}catch(e){}});
+ const n=Net.cl.filter(c=>c&&c.ok).length,t1=Date.now();while(raws.length<n&&Date.now()-t1<3500)await new Promise(r=>setTimeout(r,150));delete Net.cw[tp];Net.cl.forEach(st=>{try{st.c.unsubscribe(tp)}catch(e){}});return{raws}},
+async login(u,p,hasLocal){const key=await this.kd(u,p),g=await this.get(u);
+ if(g.err)return hasLocal?{key,S:null}:{err:'برای ورود از دستگاه جدید باید به سرور وصل باشی؛ اینترنت را بررسی کن'};
+ let best=null,bad=0;for(const raw of g.raws){try{const o=await this.unpack(key,raw);if(Net.normName(o.acc)===u&&(!best||(o.t||0)>(best.t||0)))best=o}catch(e){bad++}}
+ if(best)return{key,S:best};if(hasLocal)return{key,S:null};
+ return{err:bad?'رمز عبور اشتباه است':'حسابی با این نام پیدا نشد؛ اگر حساب جدید است «ثبت‌نام» کن'}},
+async up(f){if(!S||S.setup||!this.k||this.busy)return;const key=this.k,sig=S.t,acc=S.acc;if(!f&&this.last===sig)return;
+ const copy=JSON.parse(JSON.stringify(S));copy.hist=(copy.hist||[]).slice(0,10);copy.inbox=(copy.inbox||[]).slice(0,15);this.busy=1;
+ try{await Net.init();if(!Net.connected)return;let blob=await this.pack(key,copy);if(blob.length>240000){copy.hist=[];copy.inbox=[];copy.market=[];copy.notif=[];blob=await this.pack(key,copy);if(blob.length>240000)return}
+  const tp=Net.root+'/cloud/'+await this.tid(acc);let n=0;Net.cl.forEach(st=>{if(st&&st.ok)try{st.c.publish(tp,blob,{qos:1,retain:true},e=>{if(!e)n++})}catch(e){}});await new Promise(r=>setTimeout(r,500));if(n)this.last=sig}catch(e){}finally{this.busy=0}},
+tick(){if(Date.now()-this.tm>45000){this.tm=Date.now();this.up()}},
+async store(u,key){try{const r=await crypto.subtle.exportKey('raw',key);localStorage.setItem('ck4-'+u,b64c(new Uint8Array(r)))}catch(e){}},
+async restore(u){try{const t=localStorage.getItem('ck4-'+u);if(t)this.k=await crypto.subtle.importKey('raw',unb64(t),{name:'AES-GCM'},true,['encrypt','decrypt'])}catch(e){}}};
+Net.cloudRx=(t,x)=>{const f=Net.cw&&Net.cw[t];if(f&&x)f(x)};
 let MK=0;
 async function mkClub(){if(MK)return;const bad=/[<>&"'`\\]/g;const n=SU.name.replace(bad,'').replace(/\s+/g,' ').trim().slice(0,18);if(n.length<2)return toast('نام باشگاه را وارد کنید (حداقل ۲ حرف)');MK=1;toast('در حال بررسی نام باشگاه…');let r;try{r=await Net.reserve('club',n,S.acc)}catch(e){r=-1}MK=0;if(!S||!S.setup)return;if(r===0)return toast('این نام باشگاه قبلاً توسط مربی دیگری گرفته شده است؛ نام دیگری انتخاب کنید');const c=COLS[SU.ci];S.club={name:n,icon:SU.icon,shape:SU.shape,c1:c[0],c2:c[1],ac:c[2],kit:SU.kit,stad:(SU.stad.replace(bad,'').trim()||'ورزشگاه '+n).slice(0,24)};if(r===-1)S.club.pcl=1;S.setup=0;startClub(0,-4);addIn({ty:'info',txt:`🎉 خوش آمدید مربی! باشگاه ${n} در ${DIV[0]} شروع می‌کند. هدف: رده ۱۰ یا بالاتر و صعود تا لیگ برتر.`});save();render();if(r===-1)setTimeout(()=>toast('اتصال به سرور برقرار نیست؛ نام باشگاه بعداً ثبت می‌شود'),600)}
-function boot(){try{trSane(Net.online.transfers);lgSane(Net.online.leagues);Object.keys(Net.ranks).forEach(k=>{if(!rkOk(Net.ranks[k]))delete Net.ranks[k]});Net.persist('transfers');Net.persist('leagues');lsSet('mb-ranks-v4',Net.ranks)}catch(e){}const u=localStorage.getItem('cs');if(u){try{const j=localStorage.getItem(Net.key(u));if(j){S=JSON.parse(j);if(!S.setup)catchUp()}}catch(e){S=null}}if(u)Net.resub();render()}
+function boot(){try{trSane(Net.online.transfers);lgSane(Net.online.leagues);Object.keys(Net.ranks).forEach(k=>{if(!rkOk(Net.ranks[k]))delete Net.ranks[k]});Net.persist('transfers');Net.persist('leagues');lsSet('mb-ranks-v4',Net.ranks)}catch(e){}const u=localStorage.getItem('cs');if(u){try{const j=localStorage.getItem(Net.key(u));if(j){S=JSON.parse(j);if(!S.setup)catchUp()}}catch(e){S=null}}if(u){Net.resub();CLOUD.restore(u)}render()}
 V.s=()=>{const cs=curStd(),pr=tPrice(),F=fans(),at=attend(pr),full=F*tkF(pr)>=cs.cap,ps=Array.from({length:10},(_,i)=>i+1);let best=1,bi=0;ps.forEach(q=>{const v=attend(q)*q;if(v>bi){bi=v;best=q}});
 return`<div class="card hero"><div class="hd">🏟️ ${cs.n}</div>${stadArt(S.std|0)}<div class="grid g3"><div class="chip">👥 ${fa(F)} هوادار</div><div class="chip">🪑 ظرفیت ${fa(cs.cap)}</div><div class="chip">🎟️ ${fa(at)} نفر</div></div><p class="mu">هوادار = پایه‌ی لیگ + نصف امتیاز رتبه‌بندی (${fa(acctScore())} امتیاز). درآمد بلیت هر بازی خانگی: <b>🪙 ${fa(at*pr)}</b> • اجاره: 🪙 ${fa(cs.rent)}${full?'<br>ورزشگاه پر می‌شود؛ می‌توانی قیمت را بالاتر ببری.':''}</p></div>
 <div class="card"><div class="hd">🎟️ قیمت بلیت</div>${ps.map(q=>{const a=attend(q),sel=q==pr;return`<div class="row pl"><span><b>🪙 ${fa(q)}</b> • ${fa(a)} نفر${a>=cs.cap?' (پر)':''}<br><span class="mu">درآمد ${fa(a*q)}${q==best?' ⭐ بهترین':''}</span></span><button class="btn s ${sel?'':'o'}" ${sel?'disabled':''} onclick="setTP(${q})">${sel?'انتخاب‌شده':'انتخاب'}</button></div>`}).join('')}</div>
@@ -698,7 +735,7 @@ function applyGift(d){if(!S||!d||d.to!==S.acc||typeof d.id!='string'||d.id.lengt
 setInterval(()=>{if(ADM&&$('#adl')&&document.activeElement!==$('#adq'))$('#adl').innerHTML=admList()},4000);
 boot();
 setInterval(()=>{if(!S||S.setup)return;cd();tickMD()},1000);
-setInterval(()=>{if(!S||S.setup)return;syncLg();pushSnap();contractCheck();lgRankSync();rkWatch();pubRank()},5000);
+setInterval(()=>{if(!S||S.setup)return;syncLg();pushSnap();contractCheck();lgRankSync();rkWatch();pubRank();CLOUD.tick()},5000);
 setInterval(()=>{if(!S||S.setup||S.fired)return;S.players.forEach(p=>p.en=Math.min(100,p.en+1+S.fac.doc));save();if($('#m').style.display!='flex'&&'lxo'.includes(tab))render()},30000);
-addEventListener('online',()=>Net.kick());document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible'&&S&&!S.setup){Net.kick();syncLg();tickMD()}});addEventListener('pagehide',()=>{try{save();Net.drain()}catch(e){}});
+addEventListener('online',()=>Net.kick());document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible'&&S&&!S.setup){Net.kick();syncLg();tickMD()}});addEventListener('pagehide',()=>{try{save();Net.drain();CLOUD.up(1)}catch(e){}});
 </script></body></html>
